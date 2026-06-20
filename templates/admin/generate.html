@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+{% block title %}Генератор опросов — AI{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+
+  {% set active = 'generate' %}
+  {% include "admin/_nav.html" %}
+
+  <main class="max-w-4xl mx-auto px-6 py-10">
+
+    <!-- ══ СОСТОЯНИЕ: ВВОД ══════════════════════════════════════════════ -->
+    <div id="state-input">
+
+      <!-- Заголовок -->
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 shadow-lg" style="background: linear-gradient(135deg,#6d28d9,#8b5cf6);">
+          <svg class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 class="text-3xl font-extrabold text-gray-900 mb-2">AI Генератор опросов</h1>
+        <p class="text-gray-500 max-w-md mx-auto text-sm leading-relaxed">Опишите тему — AI создаст полноценный опрос с вопросами, вариантами ответов и структурой по страницам</p>
+      </div>
+
+      <!-- Главная карточка -->
+      <div class="bg-white rounded-3xl border border-gray-100 shadow-xl p-8 mb-6">
+
+        <!-- Основной промпт -->
+        <div class="mb-7">
+          <label class="block text-sm font-semibold text-gray-800 mb-3">Что хотите узнать?</label>
+          <div class="relative">
+            <textarea id="topic" rows="4" maxlength="800"
+              placeholder="Например: «Удовлетворённость клиентов нашим мобильным приложением для доставки еды» или «Как сотрудники оценивают корпоративную культуру и рабочую среду»"
+              class="w-full border-2 border-gray-100 rounded-2xl px-4 py-3.5 text-sm focus:outline-none focus:border-violet-400 transition resize-none leading-relaxed placeholder-gray-300"></textarea>
+            <span id="char-count" class="absolute bottom-3 right-4 text-[11px] text-gray-300 font-mono pointer-events-none">0/800</span>
+          </div>
+        </div>
+
+        <!-- Аудитория (опционально) -->
+        <div class="mb-7">
+          <label class="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Аудитория <span class="font-normal text-gray-300 normal-case">(необязательно)</span></label>
+          <input id="audience" type="text" placeholder="Например: покупатели 25-45 лет, IT-специалисты, студенты первого курса..."
+            class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition placeholder-gray-300" />
+        </div>
+
+        <!-- Настройки -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+
+          <!-- Кол-во вопросов -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wide">Вопросов</label>
+            <div class="flex flex-wrap gap-1.5" id="count-pills">
+              {% for n in [5, 8, 10, 15, 20] %}
+              <button type="button" data-val="{{ n }}" onclick="setPill('count-pills', this)"
+                class="pill px-3 py-1.5 rounded-lg text-xs font-semibold border transition {{ 'bg-violet-600 text-white border-violet-600' if n == 10 else 'bg-white text-gray-500 border-gray-200 hover:border-violet-300' }}">
+                {{ n }}
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Язык -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wide">Язык</label>
+            <div class="flex flex-wrap gap-1.5" id="lang-pills">
+              <button type="button" data-val="auto" onclick="setPill('lang-pills', this)" class="pill px-3 py-1.5 rounded-lg text-xs font-semibold border bg-violet-600 text-white border-violet-600 transition">🌐 Авто</button>
+              <button type="button" data-val="ru" onclick="setPill('lang-pills', this)" class="pill px-3 py-1.5 rounded-lg text-xs font-semibold border bg-white text-gray-500 border-gray-200 hover:border-violet-300 transition">🇷🇺 RU</button>
+              <button type="button" data-val="en" onclick="setPill('lang-pills', this)" class="pill px-3 py-1.5 rounded-lg text-xs font-semibold border bg-white text-gray-500 border-gray-200 hover:border-violet-300 transition">🇺🇸 EN</button>
+              <button type="button" data-val="uz" onclick="setPill('lang-pills', this)" class="pill px-3 py-1.5 rounded-lg text-xs font-semibold border bg-white text-gray-500 border-gray-200 hover:border-violet-300 transition">🇺🇿 UZ</button>
+            </div>
+          </div>
+
+          <!-- Стиль -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wide">Тип вопросов</label>
+            <div class="flex flex-wrap gap-1.5" id="style-pills">
+              <button type="button" data-val="choice_heavy" onclick="setPill('style-pills', this)" class="pill px-3 py-1.5 rounded-lg text-xs font-semibold border bg-white text-gray-500 border-gray-200 hover:border-violet-300 transition">☑ Тест</button>
+              <button type="button" data-val="balanced" onclick="setPill('style-pills', this)" class="pill px-3 py-1.5 rounded-lg text-xs font-semibold border bg-violet-600 text-white border-violet-600 transition">⚖️ Микс</button>
+              <button type="button" data-val="text_heavy" onclick="setPill('style-pills', this)" class="pill px-3 py-1.5 rounded-lg text-xs font-semibold border bg-white text-gray-500 border-gray-200 hover:border-violet-300 transition">✏️ Эссе</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Кнопка -->
+        <button id="generate-btn" onclick="startGenerate()"
+          class="w-full text-white font-bold py-4 rounded-2xl text-base transition-all duration-200 shadow-lg flex items-center justify-center gap-2.5"
+          style="background: linear-gradient(135deg, #6d28d9, #7c3aed, #8b5cf6); box-shadow: 0 8px 24px rgba(124,58,237,0.3);">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-linejoin="round"/>
+          </svg>
+          Сгенерировать опрос
+        </button>
+
+      </div>
+
+      <!-- Примеры тем -->
+      <div class="text-center">
+        <p class="text-xs text-gray-400 mb-3 font-medium">Попробуйте:</p>
+        <div class="flex flex-wrap justify-center gap-2">
+          {% for ex in [
+            'Удовлетворённость сотрудников работой',
+            'Обратная связь после онлайн-курса',
+            'Покупательские привычки в e-commerce',
+            'Качество обслуживания в ресторане',
+            'NPS опрос для SaaS продукта',
+          ] %}
+          <button onclick="useExample(this)" data-text="{{ ex }}"
+            class="text-xs px-3 py-1.5 rounded-full bg-white border border-gray-200 text-gray-500 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition">
+            {{ ex }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══ СОСТОЯНИЕ: ЗАГРУЗКА ══════════════════════════════════════════ -->
+    <div id="state-loading" class="hidden">
+      <div class="bg-white rounded-3xl border border-gray-100 shadow-xl p-12 text-center">
+
+        <!-- Анимированный спиннер -->
+        <div class="relative w-24 h-24 mx-auto mb-8">
+          <div class="absolute inset-0 rounded-full" style="background: linear-gradient(135deg,#6d28d9,#8b5cf6); animation: spin 1.2s linear infinite;"></div>
+          <div class="absolute inset-1.5 rounded-full bg-white flex items-center justify-center">
+            <svg class="w-8 h-8 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <h2 class="text-xl font-bold text-gray-900 mb-2">AI создаёт опрос…</h2>
+        <p id="loading-step" class="text-sm text-gray-500 mb-10">Анализирую тему и целевую аудиторию…</p>
+
+        <!-- Шаги -->
+        <div class="max-w-xs mx-auto space-y-3 text-left">
+          <div class="step-item flex items-center gap-3" data-step="0">
+            <div class="step-dot w-6 h-6 rounded-full border-2 border-gray-200 flex items-center justify-center flex-shrink-0 transition-all duration-300"></div>
+            <span class="text-sm text-gray-500">Анализ темы</span>
+          </div>
+          <div class="step-item flex items-center gap-3" data-step="1">
+            <div class="step-dot w-6 h-6 rounded-full border-2 border-gray-200 flex items-center justify-center flex-shrink-0 transition-all duration-300"></div>
+            <span class="text-sm text-gray-500">Формирование вопросов</span>
+          </div>
+          <div class="step-item flex items-center gap-3" data-step="2">
+            <div class="step-dot w-6 h-6 rounded-full border-2 border-gray-200 flex items-center justify-center flex-shrink-0 transition-all duration-300"></div>
+            <span class="text-sm text-gray-500">Генерация вариантов ответов</span>
+          </div>
+          <div class="step-item flex items-center gap-3" data-step="3">
+            <div class="step-dot w-6 h-6 rounded-full border-2 border-gray-200 flex items-center justify-center flex-shrink-0 transition-all duration-300"></div>
+            <span class="text-sm text-gray-500">Финальная обработка</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ СОСТОЯНИЕ: ПРЕВЬЮ / РЕДАКТИРОВАНИЕ ══════════════════════════ -->
+    <div id="state-preview" class="hidden">
+
+      <!-- Тулбар -->
+      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <button onclick="backToInput()" class="flex items-center gap-1.5 text-sm text-gray-500 hover:text-violet-600 transition font-medium">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6" stroke-linecap="round"/></svg>
+          Изменить запрос
+        </button>
+        <div class="flex items-center gap-2">
+          <span id="q-count-badge" class="text-xs font-semibold bg-violet-100 text-violet-700 px-3 py-1 rounded-full"></span>
+          <button onclick="regenerate()" class="text-xs font-semibold text-gray-500 hover:text-violet-600 bg-white border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke-linecap="round"/></svg>
+            Перегенерировать
+          </button>
+        </div>
+      </div>
+
+      <!-- Заголовок и описание (редактируемые) -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-md p-6 mb-4">
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Название опроса</span>
+            </div>
+            <div id="edit-title" contenteditable="true"
+              class="text-xl font-bold text-gray-900 outline-none border-b-2 border-transparent focus:border-violet-400 pb-0.5 transition min-h-[1.5rem]"></div>
+          </div>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-50">
+          <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Описание</span>
+          <div id="edit-description" contenteditable="true"
+            class="text-sm text-gray-600 mt-1 outline-none border-b-2 border-transparent focus:border-violet-400 pb-0.5 transition min-h-[1.2rem] leading-relaxed"></div>
+        </div>
+      </div>
+
+      <!-- Список вопросов -->
+      <div id="questions-preview" class="space-y-3 mb-4"></div>
+
+      <!-- Добавить вопрос -->
+      <button onclick="addEmptyQuestion()" class="w-full border-2 border-dashed border-gray-200 hover:border-violet-300 hover:bg-violet-50/40 text-gray-400 hover:text-violet-600 rounded-2xl py-3.5 text-sm font-semibold transition flex items-center justify-center gap-2 mb-8">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+        Добавить вопрос
+      </button>
+
+      <!-- Sticky нижняя панель сохранения -->
+      <div class="sticky bottom-4 bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-100 shadow-xl p-4 flex items-center gap-3">
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-gray-400 mb-0.5">Проверьте вопросы и сохраните опрос</p>
+          <p id="save-summary" class="text-sm font-semibold text-gray-800"></p>
+        </div>
+        <button onclick="saveSurvey()"
+          class="flex-shrink-0 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 text-sm"
+          style="background: linear-gradient(135deg, #6d28d9, #7c3aed);">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Сохранить опрос
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ══ СОСТОЯНИЕ: СОХРАНЕНО ════════════════════════════════════════ -->
+    <div id="state-saved" class="hidden">
+      <div class="bg-white rounded-3xl border border-gray-100 shadow-xl p-12 text-center">
+        <div class="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center shadow-lg" style="background: linear-gradient(135deg, #6d28d9, #8b5cf6);">
+          <svg class="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"
+              style="stroke-dasharray: 26; stroke-dashoffset: 26; animation: draw-check 0.5s ease-out 0.3s forwards;"/>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-extrabold text-gray-900 mb-2">Опрос создан!</h2>
+        <p class="text-gray-500 text-sm mb-8" id="saved-title"></p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <a id="saved-link-view" href="#" target="_blank"
+            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Открыть опрос
+          </a>
+          <a id="saved-link-responses" href="#"
+            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Ответы
+          </a>
+          <button onclick="startOver()"
+            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+            Создать ещё
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<style>
+  @keyframes draw-check { to { stroke-dashoffset: 0; } }
+  [contenteditable]:focus { outline: none; }
+  [contenteditable]:empty::before {
+    content: attr(data-placeholder);
+    color: #d1d5db;
+    pointer-events: none;
+  }
+  .q-card { transition: box-shadow 0.15s; }
+  .q-card:hover { box-shadow: 0 4px 20px rgba(124,58,237,0.08); }
+</style>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────
+let currentSurvey = null;
+let lastParams = null;
+
+function show(id) {
+  ['state-input','state-loading','state-preview','state-saved'].forEach(s => {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// ── Pill toggles ───────────────────────────────────────────────────────
+function setPill(groupId, btn) {
+  document.querySelectorAll(`#${groupId} .pill`).forEach(b => {
+    const active = b === btn;
+    b.className = b.className
+      .replace(/bg-violet-600 text-white border-violet-600/g, '')
+      .replace(/bg-white text-gray-500 border-gray-200 hover:border-violet-300/g, '')
+      .trim();
+    b.classList.add(...(active
+      ? ['bg-violet-600', 'text-white', 'border-violet-600']
+      : ['bg-white', 'text-gray-500', 'border-gray-200', 'hover:border-violet-300']));
+  });
+}
+
+function getPill(groupId) {
+  const active = document.querySelector(`#${groupId} .pill.bg-violet-600`);
+  return active ? active.dataset.val : null;
+}
+
+// ── Char counter ───────────────────────────────────────────────────────
+document.getElementById('topic').addEventListener('input', function() {
+  document.getElementById('char-count').textContent = this.value.length + '/800';
+});
+
+// ── Examples ───────────────────────────────────────────────────────────
+function useExample(btn) {
+  document.getElementById('topic').value = btn.dataset.text;
+  document.getElementById('char-count').textContent = btn.dataset.text.length + '/800';
+  document.getElementById('topic').focus();
+}
+
+// ── Loading animation ──────────────────────────────────────────────────
+let stepTimer = null;
+const stepMessages = [
+  'Анализирую тему и целевую аудиторию…',
+  'Формирую структуру опроса…',
+  'Генерирую варианты ответов…',
+  'Финальная обработка…',
+];
+
+function startLoadingAnim() {
+  let step = 0;
+  const steps = document.querySelectorAll('.step-item');
+  const msgEl = document.getElementById('loading-step');
+
+  // Reset
+  steps.forEach(s => {
+    const dot = s.querySelector('.step-dot');
+    dot.className = 'step-dot w-6 h-6 rounded-full border-2 border-gray-200 flex items-center justify-center flex-shrink-0 transition-all duration-300';
+    dot.innerHTML = '';
+    s.querySelector('span').className = 'text-sm text-gray-500';
+  });
+
+  function tick() {
+    if (step >= steps.length) return;
+    msgEl.textContent = stepMessages[step];
+    const dot = steps[step].querySelector('.step-dot');
+    dot.className = 'step-dot w-6 h-6 rounded-full border-2 border-violet-500 bg-violet-500 flex items-center justify-center flex-shrink-0 transition-all duration-300';
+    dot.innerHTML = '<svg class="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7" stroke-linecap="round"/></svg>';
+    steps[step].querySelector('span').className = 'text-sm font-semibold text-gray-800';
+    step++;
+    if (step < steps.length) stepTimer = setTimeout(tick, 2000 + Math.random() * 1000);
+  }
+  stepTimer = setTimeout(tick, 600);
+}
+
+function stopLoadingAnim() {
+  clearTimeout(stepTimer);
+}
+
+// ── Generate ──────────────────────────────────────────────────────────
+async function startGenerate() {
+  const topic = document.getElementById('topic').value.trim();
+  if (!topic) {
+    document.getElementById('topic').focus();
+    window.shakeAndScrollTo(document.getElementById('topic').parentElement);
+    return;
+  }
+
+  lastParams = {
+    topic,
+    audience: document.getElementById('audience').value.trim(),
+    n: parseInt(getPill('count-pills') || '10'),
+    lang: getPill('lang-pills') || 'auto',
+    style: getPill('style-pills') || 'balanced',
+  };
+
+  show('state-loading');
+  startLoadingAnim();
+
+  try {
+    const resp = await fetch('/admin/generate/run', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(lastParams),
+    });
+    const data = await resp.json();
+    stopLoadingAnim();
+
+    if (data.error) {
+      show('state-input');
+      alert('Ошибка: ' + data.error + (data.raw ? '\n\nRAW: ' + data.raw : ''));
+      return;
+    }
+
+    currentSurvey = data;
+    renderPreview(data);
+    show('state-preview');
+
+  } catch(e) {
+    stopLoadingAnim();
+    show('state-input');
+    alert('Ошибка сети: ' + e.message);
+  }
+}
+
+function regenerate() {
+  if (!lastParams) { show('state-input'); return; }
+  show('state-loading');
+  startLoadingAnim();
+  fetch('/admin/generate/run', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(lastParams),
+  })
+  .then(r => r.json())
+  .then(data => {
+    stopLoadingAnim();
+    if (data.error) { show('state-preview'); alert('Ошибка: ' + data.error); return; }
+    currentSurvey = data;
+    renderPreview(data);
+    show('state-preview');
+  })
+  .catch(e => { stopLoadingAnim(); show('state-preview'); alert(e.message); });
+}
+
+function backToInput() { show('state-input'); }
+function startOver() {
+  currentSurvey = null; lastParams = null;
+  document.getElementById('topic').value = '';
+  document.getElementById('char-count').textContent = '0/800';
+  show('state-input');
+}
+
+// ── Render preview ────────────────────────────────────────────────────
+function escH(s) {
+  const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
+}
+
+function renderPreview(survey) {
+  document.getElementById('edit-title').textContent = survey.title || '';
+  document.getElementById('edit-description').textContent = survey.description || '';
+
+  const container = document.getElementById('questions-preview');
+  container.innerHTML = '';
+  (survey.questions || []).forEach((q, i) => renderQuestion(q, i, container));
+
+  updateCounts();
+}
+
+function renderQuestion(q, i, container) {
+  const card = document.createElement('div');
+  card.className = 'q-card bg-white rounded-2xl border border-gray-100 shadow-sm p-5';
+  card.dataset.idx = i;
+
+  const typeBadge = q.qtype === 'text'
+    ? '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">✏️ Открытый</span>'
+    : '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">☑ Выбор</span>';
+
+  const optionsHtml = q.qtype === 'text'
+    ? '<div class="mt-3 px-3 py-2 bg-gray-50 rounded-xl text-xs text-gray-400 italic">Респондент напишет развёрнутый ответ</div>'
+    : (q.options || []).map((opt, oi) => `
+        <div class="flex items-center gap-2 mt-1.5 group">
+          <div class="w-3.5 h-3.5 rounded-full border-2 border-gray-300 flex-shrink-0"></div>
+          <div contenteditable="true" data-q="${i}" data-o="${oi}"
+               class="opt-text flex-1 text-sm text-gray-700 outline-none border-b border-transparent focus:border-violet-400 pb-0.5 transition"
+               >${escH(opt)}</div>
+          <button onclick="removeOption(${i},${oi})" class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition p-0.5 flex-shrink-0">
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+          </button>
+        </div>`).join('') +
+        (q.qtype !== 'text' ? `<button onclick="addOption(${i})" class="mt-2 text-xs text-violet-500 hover:text-violet-700 transition flex items-center gap-1 font-medium">
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>Вариант</button>` : '');
+
+  card.innerHTML = `
+    <div class="flex items-start gap-3">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-2 flex-wrap">
+          <span class="text-xs font-bold text-gray-400">Q${i + 1}</span>
+          ${typeBadge}
+          <span class="text-[10px] text-gray-300">Стр. ${q.page || 1}</span>
+        </div>
+        <div contenteditable="true" data-q="${i}" data-field="text"
+          class="q-text-edit font-semibold text-gray-900 text-sm leading-snug outline-none border-b-2 border-transparent focus:border-violet-400 pb-0.5 transition min-h-[1.2rem]"
+          >${escH(q.text)}</div>
+        <div class="mt-3 ml-1 options-container-${i}">${optionsHtml}</div>
+      </div>
+      <div class="flex flex-col gap-1 flex-shrink-0 ml-2">
+        <button onclick="moveQ(${i},-1)" class="p-1.5 text-gray-300 hover:text-violet-500 hover:bg-violet-50 rounded-lg transition" title="Вверх">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6" stroke-linecap="round"/></svg>
+        </button>
+        <button onclick="moveQ(${i},1)" class="p-1.5 text-gray-300 hover:text-violet-500 hover:bg-violet-50 rounded-lg transition" title="Вниз">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6" stroke-linecap="round"/></svg>
+        </button>
+        <button onclick="toggleType(${i})" class="p-1.5 text-gray-300 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition" title="Сменить тип">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+        </button>
+        <button onclick="removeQ(${i})" class="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Удалить">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>
+        </button>
+      </div>
+    </div>`;
+
+  container.appendChild(card);
+}
+
+// ── Sync survey object from DOM ───────────────────────────────────────
+function syncFromDOM() {
+  const questions = [];
+  document.querySelectorAll('#questions-preview .q-card').forEach((card, idx) => {
+    const qIdx = parseInt(card.dataset.idx);
+    const origQ = currentSurvey.questions[qIdx] || {};
+    const textEl = card.querySelector('[data-field="text"]');
+    const qtext = textEl ? textEl.textContent.trim() : '';
+    const qtype = origQ.qtype || 'choice';
+
+    const opts = [];
+    card.querySelectorAll('[data-o]').forEach(el => {
+      const v = el.textContent.trim();
+      if (v) opts.push(v);
+    });
+
+    questions.push({ text: qtext, qtype, options: opts, page: origQ.page || 1 });
+  });
+  return {
+    title: document.getElementById('edit-title').textContent.trim(),
+    description: document.getElementById('edit-description').textContent.trim(),
+    questions,
+  };
+}
+
+function updateCounts() {
+  const n = document.querySelectorAll('#questions-preview .q-card').length;
+  const badge = document.getElementById('q-count-badge');
+  const summary = document.getElementById('save-summary');
+  if (badge) badge.textContent = `${n} вопрос${n === 1 ? '' : n < 5 ? 'а' : 'ов'}`;
+  if (summary) {
+    const title = document.getElementById('edit-title').textContent.trim();
+    summary.textContent = title || 'Без названия';
+  }
+}
+
+// ── Question mutations ────────────────────────────────────────────────
+function removeQ(idx) {
+  if (currentSurvey.questions.length <= 1) { alert('Нужен хотя бы один вопрос'); return; }
+  currentSurvey.questions.splice(idx, 1);
+  rerenderQuestions();
+}
+
+function moveQ(idx, dir) {
+  const qs = currentSurvey.questions;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= qs.length) return;
+  [qs[idx], qs[newIdx]] = [qs[newIdx], qs[idx]];
+  rerenderQuestions();
+}
+
+function toggleType(idx) {
+  const q = currentSurvey.questions[idx];
+  q.qtype = q.qtype === 'text' ? 'choice' : 'text';
+  if (q.qtype === 'choice' && (!q.options || !q.options.length)) {
+    q.options = ['Вариант 1', 'Вариант 2', 'Вариант 3'];
+  }
+  rerenderQuestions();
+}
+
+function addOption(qIdx) {
+  currentSurvey = syncToModel();
+  currentSurvey.questions[qIdx].options.push('');
+  rerenderQuestions();
+  // Focus the new option
+  setTimeout(() => {
+    const cards = document.querySelectorAll('#questions-preview .q-card');
+    const opts = cards[qIdx].querySelectorAll('[data-o]');
+    if (opts.length) opts[opts.length-1].focus();
+  }, 50);
+}
+
+function removeOption(qIdx, oIdx) {
+  currentSurvey = syncToModel();
+  const opts = currentSurvey.questions[qIdx].options;
+  if (opts.length <= 2) { alert('Нужно минимум 2 варианта'); return; }
+  opts.splice(oIdx, 1);
+  rerenderQuestions();
+}
+
+function addEmptyQuestion() {
+  currentSurvey = syncToModel();
+  const lastPage = currentSurvey.questions.length
+    ? currentSurvey.questions[currentSurvey.questions.length-1].page || 1
+    : 1;
+  currentSurvey.questions.push({ text: '', qtype: 'choice', options: ['', '', ''], page: lastPage });
+  rerenderQuestions();
+  setTimeout(() => {
+    const cards = document.querySelectorAll('#questions-preview .q-card');
+    const last = cards[cards.length-1];
+    if (last) {
+      last.scrollIntoView({behavior:'smooth',block:'center'});
+      last.querySelector('[data-field="text"]').focus();
+    }
+  }, 80);
+}
+
+function syncToModel() {
+  const synced = syncFromDOM();
+  currentSurvey.title = synced.title;
+  currentSurvey.description = synced.description;
+  currentSurvey.questions = synced.questions;
+  return currentSurvey;
+}
+
+function rerenderQuestions() {
+  const container = document.getElementById('questions-preview');
+  container.innerHTML = '';
+  (currentSurvey.questions || []).forEach((q, i) => renderQuestion(q, i, container));
+  updateCounts();
+}
+
+// ── Save ──────────────────────────────────────────────────────────────
+async function saveSurvey() {
+  const payload = syncFromDOM();
+  if (!payload.title) {
+    document.getElementById('edit-title').focus();
+    return;
+  }
+  if (!payload.questions.length) { alert('Нужен хотя бы один вопрос'); return; }
+
+  try {
+    const resp = await fetch('/admin/generate/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.error) { alert('Ошибка: ' + data.error); return; }
+
+    document.getElementById('saved-title').textContent = `«${payload.title}» сохранён`;
+    document.getElementById('saved-link-view').href = `/s/${data.slug}`;
+    document.getElementById('saved-link-responses').href = `/admin/surveys/${data.id}/responses`;
+    show('state-saved');
+    window.fireConfetti && window.fireConfetti();
+  } catch(e) {
+    alert('Ошибка: ' + e.message);
+  }
+}
+
+// ── Auto-update summary on title edit ────────────────────────────────
+document.getElementById('edit-title').addEventListener('input', updateCounts);
+</script>
+{% endblock %}

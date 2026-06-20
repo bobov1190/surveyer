@@ -1,15 +1,18 @@
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime
-import json, os, csv, io, re
+from dotenv import load_dotenv
+import json, os, csv, io, re, httpx
 
 from database import get_db, init_db
 from models import Survey, Question, SurveyResponse
 from questions import QUESTIONS
+
+load_dotenv()
 
 app = FastAPI(title="Survey App")
 app.add_middleware(
@@ -21,6 +24,8 @@ templates = Jinja2Templates(directory="templates")
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "ovosound")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "12341007")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
 
 
 def slugify(s: str) -> str:
@@ -506,6 +511,155 @@ async def admin_survey_export(request: Request, sid: int, db: Session = Depends(
         iter([output.getvalue()]), media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={s.slug}-responses.csv"},
     )
+
+
+# ── AI Survey Generator ────────────────────────────────────────────────────────
+
+@app.get("/admin/generate", response_class=HTMLResponse)
+async def generate_get(request: Request):
+    if not is_admin(request):
+        return RedirectResponse(url="/admin/login")
+    return templates.TemplateResponse(request, "admin/generate.html", {})
+
+
+@app.post("/admin/generate/run")
+async def generate_run(request: Request):
+    if not is_admin(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    body = await request.json()
+    topic = body.get("topic", "").strip()
+    n = max(3, min(25, int(body.get("n", 10))))
+    lang = body.get("lang", "auto")
+    audience = body.get("audience", "").strip()
+    style = body.get("style", "balanced")  # "choice_heavy" | "balanced" | "text_heavy"
+
+    if not topic:
+        return JSONResponse({"error": "Укажите тему опроса"}, status_code=400)
+
+    mix = {"choice_heavy": "85% choice, 15% text", "balanced": "65% choice, 35% text", "text_heavy": "40% choice, 60% text"}[style]
+    lang_str = {"ru": "Russian", "en": "English", "uz": "Uzbek", "auto": "the same language as the topic"}.get(lang, "the same language as the topic")
+    audience_line = f"\nTarget audience: {audience}" if audience else ""
+
+    system_prompt = f"""You are an expert survey designer who creates insightful, professional surveys.
+Return ONLY valid JSON — no markdown, no explanation, no code fences, just raw JSON.
+
+Required format:
+{{
+  "title": "Concise survey title",
+  "description": "1-2 sentence intro shown to respondents before they start",
+  "questions": [
+    {{
+      "text": "Clear, specific question text",
+      "qtype": "choice",
+      "options": ["Option A", "Option B", "Option C"],
+      "page": 1
+    }},
+    {{
+      "text": "Open-ended question text",
+      "qtype": "text",
+      "options": [],
+      "page": 2
+    }}
+  ]
+}}
+
+Rules:
+- Mix: {mix} (qtype "choice" = multiple choice 3-5 options, qtype "text" = free text answer)
+- Group 2-4 related questions per page using the "page" field
+- Questions must flow naturally and progressively deepen insight
+- Each choice question needs 3-5 distinct, non-overlapping options
+- Write everything in {lang_str}
+- Make questions specific and unambiguous — avoid vague filler questions
+- Total questions: exactly {n}"""
+
+    user_prompt = f"Topic: {topic}{audience_line}\n\nGenerate the survey now."
+
+    try:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            resp = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://surveyapp.local",
+                    "X-Title": "Survey Generator",
+                },
+                json={
+                    "model": OPENROUTER_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "max_tokens": 5000,
+                    "temperature": 0.72,
+                }
+            )
+        data = resp.json()
+        if "error" in data:
+            return JSONResponse({"error": data["error"].get("message", "OpenRouter API error")}, status_code=500)
+
+        content = data["choices"][0]["message"]["content"].strip()
+        # Strip markdown fences if AI added them
+        if "```" in content:
+            parts = content.split("```")
+            for part in parts:
+                part = part.strip()
+                if part.startswith("json"):
+                    part = part[4:].strip()
+                if part.startswith("{"):
+                    content = part
+                    break
+
+        survey = json.loads(content)
+        return JSONResponse(survey)
+
+    except json.JSONDecodeError as e:
+        raw = content[:600] if 'content' in dir() else "no content"
+        return JSONResponse({"error": f"AI вернул невалидный JSON: {e}", "raw": raw}, status_code=500)
+    except httpx.TimeoutException:
+        return JSONResponse({"error": "Таймаут — AI думал слишком долго. Попробуйте ещё раз."}, status_code=504)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/admin/generate/save")
+async def generate_save(request: Request, db: Session = Depends(get_db)):
+    if not is_admin(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    body = await request.json()
+    title = body.get("title", "").strip()
+    description = body.get("description", "").strip()
+    questions = body.get("questions", [])
+
+    if not title:
+        return JSONResponse({"error": "Нужен заголовок"}, status_code=400)
+    if not questions:
+        return JSONResponse({"error": "Нужен хотя бы один вопрос"}, status_code=400)
+
+    slug_base = slugify(title)
+    slug = slug_base
+    n = 1
+    while db.query(Survey).filter(Survey.slug == slug).first():
+        slug = f"{slug_base}-{n}"
+        n += 1
+
+    s = Survey(title=title, slug=slug, description=description,
+               is_active=True, created_at=datetime.utcnow())
+    db.add(s)
+    db.flush()
+    for i, q in enumerate(questions):
+        db.add(Question(
+            survey_id=s.id,
+            text=q.get("text", ""),
+            options=json.dumps(q.get("options", [])),
+            qtype=q.get("qtype", "choice"),
+            page=q.get("page", 1),
+            order=i,
+        ))
+    db.commit()
+    return JSONResponse({"id": s.id, "slug": slug})
 
 
 # ── Legacy redirects ───────────────────────────────────────────────────────────
