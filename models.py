@@ -20,7 +20,8 @@ class Question(Base):
     id = Column(Integer, primary_key=True, index=True)
     survey_id = Column(Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False)
     text = Column(Text, nullable=False)
-    options = Column(Text, nullable=False)  # JSON array
+    options = Column(Text, nullable=False)  # JSON array (пусто для текстовых вопросов)
+    qtype = Column(String(20), default="choice")  # "choice" (выбор варианта) или "text" (развёрнутый ответ)
     page = Column(Integer, default=1)
     order = Column(Integer, default=0)
 

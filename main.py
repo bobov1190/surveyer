@@ -188,8 +188,9 @@ async def survey_post(request: Request, slug: str, page: int, db: Session = Depe
 
     for q in questions:
         key = f"q{q.id}"
-        if key in form:
-            answers[key] = form[key]
+        val = form.get(key, "").strip()
+        if val:
+            answers[key] = val
         else:
             errors.append(q.id)
 
@@ -291,18 +292,21 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
 # ── Admin Survey CRUD ──────────────────────────────────────────────────────────
 
 def _qs_to_dicts(questions):
-    return [{"text": q.text, "options": json.loads(q.options), "page": q.page, "order": q.order}
+    return [{"text": q.text, "options": json.loads(q.options), "page": q.page, "order": q.order,
+             "qtype": q.qtype or "choice"}
             for q in questions]
 
 
 def _parse_questions_from_form(form) -> list:
     q_texts = form.getlist("q_text[]")
     q_pages = form.getlist("q_page[]")
+    q_types = form.getlist("q_type[]")
     result = []
     for i, (txt, pg) in enumerate(zip(q_texts, q_pages)):
+        qtype = q_types[i] if i < len(q_types) else "choice"
         opts = [o.strip() for o in form.getlist(f"q_options_{i}[]") if o.strip()]
-        if txt.strip() and opts:
-            result.append({"text": txt.strip(), "options": opts,
+        if txt.strip() and (qtype == "text" or opts):
+            result.append({"text": txt.strip(), "options": opts, "qtype": qtype,
                            "page": int(pg) if str(pg).isdigit() else 1, "order": i})
     return result
 
@@ -334,7 +338,7 @@ async def survey_create_post(request: Request, db: Session = Depends(get_db)):
     if db.query(Survey).filter(Survey.slug == slug).first():
         errors.append(f"Slug '{slug}' already taken")
     if not q_data:
-        errors.append("Add at least one question with options")
+        errors.append("Add at least one question")
 
     if errors:
         return templates.TemplateResponse(request, "admin/survey_form.html", {
@@ -347,7 +351,7 @@ async def survey_create_post(request: Request, db: Session = Depends(get_db)):
     db.add(s)
     db.flush()
     for q in q_data:
-        db.add(Question(survey_id=s.id, text=q["text"],
+        db.add(Question(survey_id=s.id, text=q["text"], qtype=q.get("qtype", "choice"),
                         options=json.dumps(q["options"]), page=q["page"], order=q["order"]))
     db.commit()
     return RedirectResponse(url="/admin", status_code=303)
@@ -387,7 +391,7 @@ async def survey_edit_post(request: Request, sid: int, db: Session = Depends(get
     if db.query(Survey).filter(Survey.slug == slug, Survey.id != sid).first():
         errors.append(f"Slug '{slug}' already taken")
     if not q_data:
-        errors.append("Add at least one question with options")
+        errors.append("Add at least one question")
 
     if errors:
         return templates.TemplateResponse(request, "admin/survey_form.html", {
@@ -399,7 +403,7 @@ async def survey_edit_post(request: Request, sid: int, db: Session = Depends(get
     s.title, s.slug, s.description, s.is_active = title, slug, description, is_active
     db.query(Question).filter(Question.survey_id == sid).delete()
     for q in q_data:
-        db.add(Question(survey_id=s.id, text=q["text"],
+        db.add(Question(survey_id=s.id, text=q["text"], qtype=q.get("qtype", "choice"),
                         options=json.dumps(q["options"]), page=q["page"], order=q["order"]))
     db.commit()
     return RedirectResponse(url="/admin", status_code=303)
@@ -449,15 +453,22 @@ async def admin_survey_responses(request: Request, sid: int, db: Session = Depen
 
     stats = {}
     for q in qs:
-        opts = json.loads(q.options)
-        counts = {opt: 0 for opt in opts}
-        total = 0
-        for r in responses:
-            val = r.answers_dict.get(f"q{q.id}")
-            if val and val in counts:
-                counts[val] += 1
-                total += 1
-        stats[q.id] = {"question": q, "counts": counts, "total": total}
+        qtype = q.qtype or "choice"
+        if qtype == "text":
+            text_answers = [r.answers_dict.get(f"q{q.id}") for r in responses
+                            if r.answers_dict.get(f"q{q.id}")]
+            stats[q.id] = {"question": q, "qtype": "text", "text_answers": text_answers,
+                           "total": len(text_answers), "counts": {}}
+        else:
+            opts = json.loads(q.options)
+            counts = {opt: 0 for opt in opts}
+            total = 0
+            for r in responses:
+                val = r.answers_dict.get(f"q{q.id}")
+                if val and val in counts:
+                    counts[val] += 1
+                    total += 1
+            stats[q.id] = {"question": q, "qtype": "choice", "counts": counts, "total": total}
 
     return templates.TemplateResponse(request, "admin/survey_responses.html", {
         "survey": s, "questions": qs, "responses": responses, "stats": stats, "total": len(responses),

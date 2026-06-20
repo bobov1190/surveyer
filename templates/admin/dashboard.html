@@ -62,10 +62,10 @@
         <p class="text-3xl font-bold text-gray-900">{{ total_responses }}</p>
       </div>
 
-      <div class="bg-violet-600 rounded-2xl shadow-sm p-6 text-white">
+      <div class="rounded-2xl shadow-sm p-6 text-white" style="background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #8b5cf6 100%);">
         <div class="flex items-center justify-between mb-3">
           <p class="text-sm text-violet-200">Вопросов (во всех опросах)</p>
-          <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+          <div class="w-2 h-2 bg-green-400 rounded-full shadow-sm shadow-green-400/50"></div>
         </div>
         <p class="text-3xl font-bold">{{ survey_stats | sum(attribute='question_count') }}</p>
       </div>

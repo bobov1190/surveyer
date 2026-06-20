@@ -2,11 +2,11 @@
 {% block title %}{{ survey.title }} — Страница {{ page }} из {{ total_pages }}{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+<div class="min-h-screen flex items-center justify-center py-12 px-4" style="background: radial-gradient(ellipse at 15% 60%, rgba(124,58,237,0.06) 0%, transparent 55%), radial-gradient(ellipse at 85% 15%, rgba(139,92,246,0.05) 0%, transparent 45%), #f9fafb;">
   <div class="w-full max-w-lg">
 
     <form method="POST" action="/s/{{ survey.slug }}/{{ page }}" id="survey-page-form" novalidate>
-      <div class="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm animate-in">
+      <div class="bg-white p-8 rounded-2xl border border-gray-100 shadow-md animate-in">
 
         <!-- Прогресс -->
         <div class="flex items-center gap-3 mb-8">
@@ -62,6 +62,14 @@
             {% endif %}
 
             <div class="space-y-1">
+              {% if q.qtype == 'text' %}
+              <textarea
+                name="{{ ans_key }}"
+                rows="3"
+                placeholder="Напишите ваш ответ..."
+                class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none transition"
+              >{{ saved.get(ans_key, '') }}</textarea>
+              {% else %}
               {% for option in q.options_list %}
               {% set input_id = "q" ~ q.id ~ "_" ~ loop.index0 %}
               <div class="option-row">
@@ -78,6 +86,7 @@
                 </label>
               </div>
               {% endfor %}
+              {% endif %}
             </div>
           </div>
           {% endfor %}
@@ -125,7 +134,11 @@
     return input ? input.name : null;
   }
   function isAnswered(block) {
-    return !!block.querySelector('input[type="radio"]:checked');
+    const radio = block.querySelector('input[type="radio"]:checked');
+    if (radio) return true;
+    const ta = block.querySelector('textarea');
+    if (ta) return ta.value.trim().length > 0;
+    return false;
   }
   function allAnswered() {
     return qBlocks.every(isAnswered);
@@ -190,6 +203,12 @@
       }
       scheduleAutoAdvance();
     });
+    var ta = block.querySelector('textarea');
+    if (ta) {
+      ta.addEventListener('input', function () {
+        setBadge(block, ta.value.trim().length > 0);
+      });
+    }
   });
 
   form.addEventListener('submit', function (e) {

@@ -35,3 +35,16 @@ def init_db():
                 if col not in cols:
                     conn.execute(text(ddl))
             conn.commit()
+
+    # Migrate: тип вопроса (выбор / открытый текстовый ответ)
+    if "survey_questions" in insp.get_table_names():
+        q_cols = [c["name"] for c in insp.get_columns("survey_questions")]
+        if "qtype" not in q_cols:
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "ALTER TABLE survey_questions ADD COLUMN qtype VARCHAR(20) DEFAULT 'choice'"
+                ))
+                conn.execute(text(
+                    "UPDATE survey_questions SET qtype = 'choice' WHERE qtype IS NULL"
+                ))
+                conn.commit()
