@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Survey — Page {{ page }} of {{ total_pages }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+  <div class="w-full max-w-lg">
+
+    <form method="POST" action="/survey/{{ page }}">
+      <div class="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+
+        <!-- Progress bar -->
+        <div class="flex items-center gap-3 mb-8">
+          {% if page > 1 %}
+            <a href="/survey/{{ page - 1 }}"
+               class="text-gray-400 hover:text-gray-600 transition flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+          {% else %}
+            <div class="w-6 h-6 flex-shrink-0"></div>
+          {% endif %}
+
+          <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full bg-violet-600 rounded-full transition-all duration-500"
+                 style="width: {{ ((page / total_pages) * 100) | int }}%"></div>
+          </div>
+          <span class="text-xs font-semibold text-gray-400 flex-shrink-0">{{ page }}/{{ total_pages }}</span>
+        </div>
+
+        {% if page == 1 %}
+        <div class="mb-8">
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">Consumer shopping trends</h1>
+          <p class="text-sm text-gray-500">The survey consists of 13 questions. Thank you for completing it!</p>
+        </div>
+        {% endif %}
+
+        <!-- Questions -->
+        <div class="space-y-8 mb-8">
+          {% for q in questions %}
+          {% set ans_key = "q" ~ q.id %}
+          <div>
+            <h2 class="text-sm font-semibold text-gray-900 mb-3 leading-snug">
+              {{ q.id }}. {{ q.text }}
+            </h2>
+
+            {% if q.id in errors %}
+            <div class="flex items-center gap-1.5 text-red-500 text-xs mb-2">
+              <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              Please select an answer to continue
+            </div>
+            {% endif %}
+
+            <div class="space-y-2.5">
+              {% for option in q.options %}
+              {% set input_id = "q" ~ q.id ~ "_" ~ loop.index0 %}
+              <input
+                type="radio"
+                id="{{ input_id }}"
+                name="{{ ans_key }}"
+                value="{{ option }}"
+                {% if saved.get(ans_key) == option %}checked{% endif %}
+              />
+              <label for="{{ input_id }}">{{ option }}</label>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Navigation buttons -->
+        <div class="flex gap-3">
+          {% if page == 1 %}
+            <button type="button"
+                    class="flex-1 bg-gray-100 text-gray-300 font-semibold py-2.5 px-6 rounded-xl text-sm cursor-not-allowed"
+                    disabled>Back</button>
+          {% else %}
+            <a href="/survey/{{ page - 1 }}"
+               class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 px-6 rounded-xl text-sm text-center transition">
+              Back
+            </a>
+          {% endif %}
+
+          <button type="submit"
+                  class="flex-1 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold py-2.5 px-6 rounded-xl text-sm transition">
+            {% if page == total_pages %}Finish{% else %}Next{% endif %}
+          </button>
+        </div>
+
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

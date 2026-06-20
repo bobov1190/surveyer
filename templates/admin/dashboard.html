@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Админ — Дашборд{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+
+  {% set active = 'dashboard' %}
+  {% include "admin/_nav.html" %}
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+
+    <!-- Заголовок -->
+    <div class="flex items-start justify-between mb-8 flex-wrap gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Дашборд</h1>
+        <p class="text-gray-500 text-sm mt-1">Обзор всех созданных опросов</p>
+      </div>
+      <a href="/admin/surveys/create"
+         class="bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white text-sm font-semibold px-4 py-2.5
+                rounded-xl transition flex items-center gap-2 shadow-sm">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14" stroke-linecap="round"/>
+        </svg>
+        Создать опрос
+      </a>
+    </div>
+
+    <!-- KPI-карточки -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-sm text-gray-500">Всего опросов</p>
+          <div class="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/>
+            </svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-gray-900">{{ total_surveys }}</p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-sm text-gray-500">Активные опросы</p>
+          <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+            <span class="w-2.5 h-2.5 bg-green-500 rounded-full"></span>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-gray-900">{{ active_surveys }}</p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-sm text-gray-500">Всего ответов</p>
+          <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+        </div>
+        <p class="text-3xl font-bold text-gray-900">{{ total_responses }}</p>
+      </div>
+
+      <div class="bg-violet-600 rounded-2xl shadow-sm p-6 text-white">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-sm text-violet-200">Вопросов (во всех опросах)</p>
+          <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+        </div>
+        <p class="text-3xl font-bold">{{ survey_stats | sum(attribute='question_count') }}</p>
+      </div>
+    </div>
+
+    <!-- Список опросов -->
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Ваши опросы</h2>
+      <span class="text-sm text-gray-400">всего: {{ total_surveys }}</span>
+    </div>
+
+    {% if survey_stats %}
+    <div class="space-y-3 mb-10">
+      {% for stat in survey_stats %}
+      {% set s = stat.survey %}
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+
+          <!-- Слева: инфо -->
+          <div class="flex items-start gap-3 min-w-0">
+            <span class="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 {{ 'bg-green-500' if s.is_active else 'bg-gray-300' }}"></span>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="font-semibold text-gray-900">{{ s.title }}</h3>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {{ 'bg-green-50 text-green-700' if s.is_active else 'bg-gray-100 text-gray-500' }}">
+                  {{ 'Активен' if s.is_active else 'Неактивен' }}
+                </span>
+              </div>
+              {% if s.description %}
+              <p class="text-xs text-gray-400 mt-0.5 max-w-md truncate">{{ s.description }}</p>
+              {% endif %}
+
+              <!-- Ссылка для расшаривания -->
+              <div class="mt-2.5 flex items-center gap-1.5">
+                <code class="text-xs bg-gray-50 border border-gray-100 text-violet-600 rounded-lg px-2.5 py-1 select-all">/s/{{ s.slug }}</code>
+                <button type="button" onclick="copyLink(this, '{{ s.slug }}')"
+                        class="text-gray-400 hover:text-violet-600 transition p-1.5 rounded-lg hover:bg-gray-50" title="Скопировать ссылку">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                </button>
+                <a href="/s/{{ s.slug }}" target="_blank"
+                   class="text-gray-400 hover:text-violet-600 transition p-1.5 rounded-lg hover:bg-gray-50" title="Открыть опрос">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Середина: мини-статистика -->
+          <div class="flex items-center gap-5 text-center flex-shrink-0">
+            <div>
+              <p class="text-lg font-bold text-gray-900">{{ stat.response_count }}</p>
+              <p class="text-[11px] text-gray-400">Ответов</p>
+            </div>
+            <div>
+              <p class="text-lg font-bold text-gray-900">{{ stat.question_count }}</p>
+              <p class="text-[11px] text-gray-400">Вопросов</p>
+            </div>
+            <div class="min-w-[88px]">
+              <p class="text-xs font-medium text-gray-600">
+                {{ stat.last_response.strftime('%d.%m, %H:%M') if stat.last_response else '—' }}
+              </p>
+              <p class="text-[11px] text-gray-400">Последний ответ</p>
+            </div>
+          </div>
+
+          <!-- Справа: действия -->
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <a href="/admin/surveys/{{ s.id }}/responses"
+               class="text-xs font-medium text-gray-600 hover:text-violet-600 bg-gray-50 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition">
+              Ответы
+            </a>
+            <a href="/admin/surveys/{{ s.id }}/edit"
+               class="text-xs font-medium text-gray-600 hover:text-violet-600 bg-gray-50 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition">
+              Изменить
+            </a>
+            <a href="/admin/surveys/{{ s.id }}/export"
+               class="text-gray-400 hover:text-violet-600 transition p-1.5 rounded-lg hover:bg-gray-50" title="Экспорт CSV">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </a>
+            <form method="POST" action="/admin/surveys/{{ s.id }}/toggle">
+              <button type="submit" class="text-gray-400 hover:text-amber-500 transition p-1.5 rounded-lg hover:bg-gray-50" title="{{ 'Деактивировать' if s.is_active else 'Активировать' }}">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  {% if s.is_active %}
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  {% else %}
+                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
+                  {% endif %}
+                </svg>
+              </button>
+            </form>
+            <form method="POST" action="/admin/surveys/{{ s.id }}/delete"
+                  onsubmit="return confirm('Удалить опрос «{{ s.title }}» и все его ответы ({{ stat.response_count }} шт.)? Это действие необратимо.');">
+              <button type="submit" class="text-gray-400 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-gray-50" title="Удалить опрос">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0l-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16z"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center mb-10">
+      <svg class="w-10 h-10 mx-auto mb-3 text-gray-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/>
+      </svg>
+      <p class="text-sm font-medium text-gray-400">Опросов пока нет</p>
+      <a href="/admin/surveys/create" class="inline-block mt-4 text-sm text-violet-600 hover:text-violet-700 font-semibold transition">
+        Создать первый опрос →
+      </a>
+    </div>
+    {% endif %}
+
+    <!-- Последние ответы по всем опросам -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+        <h2 class="font-semibold text-gray-900">Последние ответы</h2>
+        <span class="text-xs text-gray-400">по всем опросам</span>
+      </div>
+
+      {% if recent %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-100">
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">#</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Респондент</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Опрос</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Дата</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {% for r in recent %}
+            <tr class="hover:bg-gray-50 transition">
+              <td class="px-6 py-3.5">
+                <span class="text-gray-400 font-mono text-xs">#{{ r.id }}</span>
+              </td>
+              <td class="px-6 py-3.5 text-gray-800 text-xs font-medium">
+                {{ ((r.first_name or '') ~ ' ' ~ (r.last_name or '')).strip() or '—' }}
+              </td>
+              <td class="px-6 py-3.5">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700">
+                  {{ r.survey_obj.title if r.survey_obj else 'Опрос удалён' }}
+                </span>
+              </td>
+              <td class="px-6 py-3.5 text-gray-600 text-xs">
+                {{ r.created_at.strftime('%d.%m.%Y  %H:%M') }}
+              </td>
+              <td class="px-6 py-3.5 text-right">
+                {% if r.survey_obj %}
+                <a href="/admin/surveys/{{ r.survey_obj.id }}/responses" class="text-xs text-violet-600 hover:text-violet-700 font-medium transition">Смотреть →</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="py-16 text-center text-gray-400">
+        <svg class="w-10 h-10 mx-auto mb-3 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/>
+        </svg>
+        <p class="text-sm font-medium">Ответов пока нет</p>
+        <p class="text-xs mt-1">Поделитесь ссылкой на опрос, чтобы начать сбор данных</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </main>
+</div>
+
+<script>
+function copyLink(btn, slug) {
+  const url = window.location.origin + '/s/' + slug;
+  navigator.clipboard.writeText(url).then(() => {
+    const original = btn.innerHTML;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    setTimeout(() => { btn.innerHTML = original; }, 1200);
+  });
+}
+</script>
+{% endblock %}

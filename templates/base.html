@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Опрос{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    /* ── Плавные переходы между страницами (полная навигация, не SPA) ── */
+    @view-transition {
+      navigation: auto;
+    }
+
+    /* ── Появление карточки при загрузке ── */
+    @keyframes fade-slide-up {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in {
+      animation: fade-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .animate-in-delay {
+      animation: fade-slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 0.08s;
+    }
+
+    /* ── Custom Radio (shadcn-style) ── */
+    input[type="radio"] { display: none; }
+
+    input[type="radio"] + label {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      color: #6b7280;
+      font-size: 0.875rem;
+      transition: color 0.15s;
+      user-select: none;
+    }
+    input[type="radio"] + label::before {
+      content: "";
+      display: inline-block;
+      width: 1.125rem;
+      height: 1.125rem;
+      border-radius: 50%;
+      border: 2px solid #d1d5db;
+      background-color: white;
+      margin-right: 0.625rem;
+      flex-shrink: 0;
+      transition: border-color 0.15s, background-image 0.1s, transform 0.15s;
+    }
+    input[type="radio"]:not(:checked) + label:hover::before {
+      border-color: #7c3aed;
+    }
+    input[type="radio"]:checked + label {
+      color: #111827;
+      font-weight: 500;
+    }
+    input[type="radio"]:checked + label::before {
+      border-color: #7c3aed;
+      transform: scale(1.08);
+      background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"%3E%3Ccircle cx="8" cy="8" r="4" fill="%237c3aed"/%3E%3C/svg%3E');
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: 100%;
+    }
+
+    /* ── Карточка-обёртка варианта ответа: вся строка кликабельна и подсвечивается ── */
+    .option-row {
+      border-radius: 0.75rem;
+      border: 1.5px solid transparent;
+      padding: 0.7rem 0.75rem;
+      transition: background-color 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .option-row:hover {
+      background-color: #fafafa;
+    }
+    .option-row:has(input:checked) {
+      background-color: #f5f3ff;
+      border-color: #ddd6fe;
+    }
+    .option-row:active {
+      transform: scale(0.99);
+    }
+
+    /* ── details/summary arrow ── */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] .chevron { transform: rotate(180deg); }
+    .chevron { transition: transform 0.2s; }
+
+    /* ── Спиннер на кнопках при отправке формы ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-spinner {
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* ── Бейдж "отвечено" рядом с номером вопроса ── */
+    @keyframes pop-in {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); }
+    }
+    .answered-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.1rem;
+      height: 1.1rem;
+      border-radius: 9999px;
+      background: #7c3aed;
+      color: #fff;
+      flex-shrink: 0;
+      animation: pop-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    /* ── Тряска при попытке продолжить с незаполненным полем ── */
+    @keyframes shake-x {
+      10%, 90% { transform: translateX(-1px); }
+      20%, 80% { transform: translateX(2px); }
+      30%, 50%, 70% { transform: translateX(-4px); }
+      40%, 60% { transform: translateX(4px); }
+    }
+    .shake { animation: shake-x 0.45s; }
+
+    /* ── Акцент слева у вопроса, который сейчас в фокусе экрана ── */
+    .q-active { position: relative; }
+    .q-active::before {
+      content: "";
+      position: absolute;
+      left: -1rem;
+      top: 0.15rem;
+      bottom: 0.15rem;
+      width: 3px;
+      border-radius: 2px;
+      background: #7c3aed;
+      opacity: 0.45;
+      transition: opacity 0.2s;
+    }
+
+    /* ── Пульс кнопки, когда страница готова к отправке ── */
+    @keyframes pulse-ready {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.35); }
+      50% { box-shadow: 0 0 0 9px rgba(124, 58, 237, 0); }
+    }
+    .pulse-ready { animation: pulse-ready 0.85s ease-out 1; }
+
+    kbd {
+      font-family: inherit;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-bottom-width: 2px;
+      border-radius: 0.3rem;
+      padding: 0.05rem 0.4rem;
+      font-size: 0.7rem;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 selection:bg-violet-100">
+  {% block content %}{% endblock %}
+  <!-- Admin hotkey: Ctrl+Alt+A. Старый Ctrl+P+A не работал, потому что Ctrl+P — это
+       зарезервированный браузером шорткат печати: Chrome/Edge/Firefox игнорируют
+       preventDefault на нём и сразу открывают системный диалог печати, который
+       забирает фокус у страницы, так что последующий keydown на "A" уже никогда
+       не долетал до document. Ctrl+Alt+A — свободная комбинация, которую браузеры
+       не перехватывают. Также не активна на /admin/* страницах — там она не нужна. -->
+  <script>
+    (function () {
+      if (window.location.pathname.indexOf('/admin') === 0) return;
+      document.addEventListener('keydown', function (e) {
+        if (e.ctrlKey && e.altKey && !e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+          e.preventDefault();
+          window.location.href = '/admin/login';
+        }
+      });
+    })();
+
+    // Универсальный хелпер: показать "загрузку" на кнопке отправки формы
+    function showLoading(btn, text) {
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
+      btn.style.opacity = '0.75';
+      btn.style.cursor = 'wait';
+      btn.innerHTML =
+        '<svg class="btn-spinner w-4 h-4 inline-block align-[-3px] mr-2" viewBox="0 0 24 24" fill="none">' +
+        '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity="0.25"/>' +
+        '<path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' +
+        '</svg>' + (text || 'Загрузка…');
+    }
+
+    // Лёгкий конфетти-эффект на canvas, без внешних библиотек
+    window.fireConfetti = function (opts) {
+      opts = opts || {};
+      var count = opts.count || 140;
+      var colors = ['#7c3aed', '#a78bfa', '#fbbf24', '#34d399', '#f472b6'];
+      var canvas = document.createElement('canvas');
+      canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      document.body.appendChild(canvas);
+      var ctx = canvas.getContext('2d');
+      var pieces = [];
+      for (var i = 0; i < count; i++) {
+        pieces.push({
+          x: canvas.width / 2 + (Math.random() - 0.5) * 80,
+          y: canvas.height * 0.32,
+          vx: (Math.random() - 0.5) * 15,
+          vy: Math.random() * -11 - 4,
+          size: Math.random() * 6 + 4,
+          color: colors[i % colors.length],
+          rot: Math.random() * 360,
+          vrot: (Math.random() - 0.5) * 14,
+          shape: Math.random() > 0.5 ? 'rect' : 'circle',
+        });
+      }
+      var gravity = 0.32, drag = 0.992, frame = 0, maxFrames = 130;
+      (function tick() {
+        frame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        pieces.forEach(function (p) {
+          p.vy += gravity; p.vx *= drag; p.vy *= drag;
+          p.x += p.vx; p.y += p.vy; p.rot += p.vrot;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot * Math.PI / 180);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = Math.max(0, 1 - frame / maxFrames);
+          if (p.shape === 'rect') {
+            ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.6);
+          } else {
+            ctx.beginPath(); ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.restore();
+        });
+        if (frame < maxFrames) {
+          requestAnimationFrame(tick);
+        } else {
+          canvas.remove();
+        }
+      })();
+    };
+
+    // Хелпер: плавный скролл + тряска у элемента с ошибкой/незаполненным вопросом
+    window.shakeAndScrollTo = function (el) {
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('shake');
+      setTimeout(function () { el.classList.remove('shake'); }, 500);
+    };
+  </script>
+</body>
+</html>

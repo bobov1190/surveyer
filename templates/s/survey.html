@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}{{ survey.title }} — Страница {{ page }} из {{ total_pages }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+  <div class="w-full max-w-lg">
+
+    <form method="POST" action="/s/{{ survey.slug }}/{{ page }}" id="survey-page-form" novalidate>
+      <div class="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm animate-in">
+
+        <!-- Прогресс -->
+        <div class="flex items-center gap-3 mb-8">
+          {% if page > 1 %}
+            <a href="/s/{{ survey.slug }}/{{ page - 1 }}" id="back-link"
+               class="text-gray-400 hover:text-gray-600 transition flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+          {% else %}
+            <div class="w-6 h-6 flex-shrink-0"></div>
+          {% endif %}
+
+          <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full bg-violet-600 rounded-full transition-all duration-700 ease-out"
+                 style="width: {{ ((page / total_pages) * 100) | int }}%"></div>
+          </div>
+          <span class="text-xs font-semibold text-gray-400 flex-shrink-0">{{ page }}/{{ total_pages }}</span>
+        </div>
+
+        {% if page == 1 %}
+        <div class="mb-8">
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">{{ survey.title }}</h1>
+          {% if survey.description %}
+          <p class="text-sm text-gray-500">{{ survey.description }}</p>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Вопросы -->
+        <div class="space-y-8 mb-8">
+          {% for q in questions %}
+          {% set ans_key = "q" ~ q.id %}
+          <div id="q-{{ q.id }}" class="q-block animate-in" style="animation-delay: {{ loop.index0 * 0.06 }}s">
+            <h2 class="text-sm font-semibold text-gray-900 mb-3 leading-snug flex items-center gap-2">
+              <span class="q-number">{{ loop.index }}.</span>
+              <span class="flex-1">{{ q.text }}</span>
+              <span class="answered-badge" style="display: {{ 'inline-flex' if saved.get(ans_key) else 'none' }};">
+                <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5">
+                  <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+            </h2>
+
+            {% if q.id in errors %}
+            <div class="flex items-center gap-1.5 text-red-500 text-xs mb-2">
+              <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path fill-rule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              Выберите ответ, чтобы продолжить
+            </div>
+            {% endif %}
+
+            <div class="space-y-1">
+              {% for option in q.options_list %}
+              {% set input_id = "q" ~ q.id ~ "_" ~ loop.index0 %}
+              <div class="option-row">
+                <input
+                  type="radio"
+                  id="{{ input_id }}"
+                  name="{{ ans_key }}"
+                  value="{{ option }}"
+                  {% if saved.get(ans_key) == option %}checked{% endif %}
+                />
+                <label for="{{ input_id }}">
+                  <span class="inline-flex items-center justify-center w-4 h-4 mr-1.5 -ml-0.5 text-[10px] text-gray-300 font-semibold flex-shrink-0 opt-num">{{ loop.index }}</span>
+                  {{ option }}
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Навигация -->
+        <div class="flex gap-3">
+          {% if page == 1 %}
+            <button type="button"
+                    class="flex-1 bg-gray-100 text-gray-300 font-semibold py-2.5 px-6 rounded-xl text-sm cursor-not-allowed"
+                    disabled>Назад</button>
+          {% else %}
+            <a href="/s/{{ survey.slug }}/{{ page - 1 }}"
+               class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 px-6 rounded-xl text-sm text-center transition">
+              Назад
+            </a>
+          {% endif %}
+
+          <button type="submit" id="submit-btn"
+                  class="flex-1 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold py-2.5 px-6 rounded-xl text-sm transition">
+            {% if page == total_pages %}Завершить{% else %}Далее{% endif %}
+          </button>
+        </div>
+
+        <p class="hidden sm:flex items-center justify-center gap-2 text-[11px] text-gray-300 mt-5">
+          <kbd>1–9</kbd> выбрать &nbsp;·&nbsp; <kbd>Enter</kbd> продолжить
+          {% if page > 1 %}&nbsp;·&nbsp; <kbd>⌫</kbd> назад{% endif %}
+        </p>
+
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('survey-page-form');
+  var qBlocks = Array.from(document.querySelectorAll('.q-block'));
+  var submitBtn = document.getElementById('submit-btn');
+  var backLink = document.getElementById('back-link');
+  var autoAdvanceTimer = null;
+
+  function groupName(block) {
+    var input = block.querySelector('input[type="radio"]');
+    return input ? input.name : null;
+  }
+  function isAnswered(block) {
+    return !!block.querySelector('input[type="radio"]:checked');
+  }
+  function allAnswered() {
+    return qBlocks.every(isAnswered);
+  }
+  function firstUnanswered() {
+    return qBlocks.find(function (b) { return !isAnswered(b); });
+  }
+  function setBadge(block, on) {
+    var badge = block.querySelector('.answered-badge');
+    if (!badge) return;
+    if (on && badge.style.display === 'none') {
+      badge.style.display = 'inline-flex';
+      badge.style.animation = 'none';
+      void badge.offsetWidth;
+      badge.style.animation = '';
+    } else if (!on) {
+      badge.style.display = 'none';
+    }
+  }
+
+  // Подсветка "активного" вопроса по скроллу (для клавиатурных шорткатов)
+  var activeBlock = qBlocks[0] || null;
+  function setActive(block) {
+    if (activeBlock === block) return;
+    if (activeBlock) activeBlock.classList.remove('q-active');
+    activeBlock = block;
+    if (activeBlock) activeBlock.classList.add('q-active');
+  }
+  if (qBlocks.length > 1 && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      var best = null, bestRatio = 0;
+      entries.forEach(function (e) {
+        if (e.intersectionRatio > bestRatio) { bestRatio = e.intersectionRatio; best = e.target; }
+      });
+      if (best) setActive(best);
+    }, { threshold: [0.3, 0.5, 0.7, 0.9] });
+    qBlocks.forEach(function (b) { io.observe(b); });
+  } else if (qBlocks.length === 1) {
+    setActive(qBlocks[0]);
+  }
+
+  function scheduleAutoAdvance() {
+    clearTimeout(autoAdvanceTimer);
+    if (!allAnswered()) return;
+    submitBtn.classList.add('pulse-ready');
+    autoAdvanceTimer = setTimeout(function () {
+      showLoading(submitBtn, '{{ "Сохраняем…" if page == total_pages else "Загрузка…" }}');
+      form.submit();
+    }, 550);
+  }
+
+  qBlocks.forEach(function (block) {
+    block.addEventListener('change', function (e) {
+      if (e.target.type !== 'radio') return;
+      setBadge(block, true);
+      var idx = qBlocks.indexOf(block);
+      var next = qBlocks[idx + 1];
+      if (next && !isAnswered(next)) {
+        setTimeout(function () {
+          next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 180);
+      }
+      scheduleAutoAdvance();
+    });
+  });
+
+  form.addEventListener('submit', function (e) {
+    var missing = firstUnanswered();
+    if (missing) {
+      e.preventDefault();
+      window.shakeAndScrollTo(missing);
+      return;
+    }
+    clearTimeout(autoAdvanceTimer);
+    showLoading(this.querySelector('[type="submit"]'), '{{ "Сохраняем…" if page == total_pages else "Загрузка…" }}');
+  });
+
+  // Клавиатура: 1-9 выбрать вариант активного вопроса, Enter — продолжить, Backspace/← — назад
+  document.addEventListener('keydown', function (e) {
+    var tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    if (/^[1-9]$/.test(e.key) && activeBlock) {
+      var labels = activeBlock.querySelectorAll('input[type="radio"]');
+      var input = labels[parseInt(e.key, 10) - 1];
+      if (input) {
+        e.preventDefault();
+        input.checked = true;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allAnswered()) {
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      } else {
+        window.shakeAndScrollTo(firstUnanswered());
+      }
+    } else if ((e.key === 'Backspace' || e.key === 'ArrowLeft') && backLink) {
+      e.preventDefault();
+      backLink.click();
+    }
+  });
+
+  {% if errors %}
+  (function () {
+    var firstError = document.getElementById('q-{{ errors[0] }}');
+    if (firstError) {
+      window.requestAnimationFrame(function () {
+        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+  })();
+  {% endif %}
+})();
+</script>
+{% endblock %}

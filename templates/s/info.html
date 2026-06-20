@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ survey.title }} — Ваши данные{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+  <div class="w-full max-w-lg">
+
+    <form method="POST" action="/s/{{ survey.slug }}/info" id="info-form">
+      <input type="hidden" name="next" value="{{ next }}" />
+
+      <div class="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm animate-in">
+
+        <div class="mb-7">
+          <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full mb-3">
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Перед началом
+          </span>
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">{{ survey.title }}</h1>
+          {% if survey.description %}
+          <p class="text-sm text-gray-500 mb-3">{{ survey.description }}</p>
+          {% endif %}
+          {% if total_questions %}
+          <div class="flex items-center gap-3 text-xs text-gray-400">
+            <span class="inline-flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 11l3 3L22 4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {{ total_questions }} вопрос{{ 'ов' if total_questions % 10 == 0 or total_questions % 10 >= 5 or (total_questions % 100 >= 11 and total_questions % 100 <= 14) else ('а' if total_questions % 10 in [2,3,4] else '') }}
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              ~{{ [(total_questions * 7 / 60) | round(0, 'ceil') | int, 1] | max }} мин
+            </span>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if errors %}
+        <div class="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-6">
+          <ul class="list-disc list-inside space-y-0.5">
+            {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <div class="space-y-4 mb-8">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1.5">Имя</label>
+              <input type="text" name="first_name" required autofocus
+                     value="{{ data.get('first_name', '') }}"
+                     placeholder="Иван"
+                     class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1.5">Фамилия</label>
+              <input type="text" name="last_name" required
+                     value="{{ data.get('last_name', '') }}"
+                     placeholder="Иванов"
+                     class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">
+              Контакты <span class="text-gray-300 font-normal">(необязательно — Telegram, телефон, email)</span>
+            </label>
+            <input type="text" name="contact"
+                   value="{{ data.get('contact', '') }}"
+                   placeholder="@username, +998 90 123 45 67 или email"
+                   class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition" />
+          </div>
+        </div>
+
+        <button type="submit"
+                class="w-full bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold py-2.5 px-6 rounded-xl text-sm transition">
+          Перейти к опросу
+        </button>
+
+        <p class="text-[11px] text-gray-400 text-center mt-4 leading-relaxed">
+          Эти данные нужны только для идентификации вашего ответа и никому не передаются.
+        </p>
+
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.getElementById('info-form').addEventListener('submit', function () {
+    showLoading(this.querySelector('[type="submit"]'), 'Переходим…');
+  });
+</script>
+{% endblock %}

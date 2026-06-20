@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Редактировать опрос' if survey and survey.id else 'Создать опрос' }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+
+  {% set active = 'edit' if survey and survey.id else 'create' %}
+  {% include "admin/_nav.html" %}
+
+  <main class="max-w-3xl mx-auto px-6 py-8">
+
+    <div class="flex items-center gap-3 mb-6">
+      <a href="/admin" class="text-gray-400 hover:text-gray-600 transition p-1.5 rounded-lg hover:bg-gray-100">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">{{ 'Редактировать опрос' if survey and survey.id else 'Создать новый опрос' }}</h1>
+        <p class="text-gray-500 text-sm mt-0.5">
+          {{ 'Обновите вопросы, варианты и настройки.' if survey and survey.id else 'Настройте опрос и получите уникальную ссылку.' }}
+        </p>
+      </div>
+    </div>
+
+    {% if survey and survey.id %}
+    <div class="bg-violet-50 border border-violet-100 rounded-2xl px-5 py-3.5 mb-6 flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <svg class="w-4 h-4 text-violet-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 13a5 5 0 0 0 7.07 0l1.41-1.41a5 5 0 0 0-7.07-7.07L10 6"/>
+          <path d="M14 11a5 5 0 0 0-7.07 0l-1.41 1.41a5 5 0 0 0 7.07 7.07L14 18"/>
+        </svg>
+        <code class="text-sm text-violet-700 font-medium truncate">/s/{{ survey.slug }}</code>
+      </div>
+      <div class="flex items-center gap-1.5 flex-shrink-0">
+        <a href="/s/{{ survey.slug }}" target="_blank" class="text-xs font-medium text-violet-600 hover:text-violet-800 bg-white px-3 py-1.5 rounded-lg transition">Открыть</a>
+        <a href="/admin/surveys/{{ survey.id }}/responses" class="text-xs font-medium text-violet-600 hover:text-violet-800 bg-white px-3 py-1.5 rounded-lg transition">Ответы</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if errors %}
+    <div class="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-6">
+      <ul class="list-disc list-inside space-y-0.5">
+        {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <form id="survey-form" method="POST" action="{{ action }}">
+
+      <!-- Основная информация -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-5">
+        <h2 class="text-sm font-semibold text-gray-900 mb-4">Детали опроса</h2>
+
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-gray-600 mb-1.5">Название</label>
+          <input id="title-input" type="text" name="title" required
+                 value="{{ survey.title if survey else '' }}"
+                 placeholder="например: Опрос удовлетворённости клиентов"
+                 class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition" />
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-gray-600 mb-1.5">Ссылка (slug)</label>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-400 flex-shrink-0">/s/</span>
+            <input id="slug-input" type="text" name="slug"
+                   value="{{ survey.slug if survey else '' }}"
+                   placeholder="генерируется из названия"
+                   class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition font-mono" />
+          </div>
+          <p class="text-xs text-gray-400 mt-1.5">Это уникальная ссылка для прохождения опроса: <span id="slug-preview" class="font-mono text-violet-600">/s/{{ survey.slug if survey else 'your-slug' }}</span></p>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-gray-600 mb-1.5">Описание <span class="text-gray-300">(необязательно, показывается на первой странице)</span></label>
+          <textarea name="description" rows="2"
+                    class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition resize-none"
+                    placeholder="Краткое описание того, о чём этот опрос...">{{ survey.description if survey else '' }}</textarea>
+        </div>
+
+        <label class="flex items-center gap-2.5 cursor-pointer select-none">
+          <input id="active-checkbox" type="checkbox" name="is_active"
+                 {% if (survey.is_active if survey else true) %}checked{% endif %}
+                 class="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
+          <span class="text-sm text-gray-700">Активен — сразу принимает ответы</span>
+        </label>
+      </div>
+
+      <!-- Вопросы -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-gray-900">Вопросы</h2>
+          <span id="question-count-label" class="text-xs text-gray-400"></span>
+        </div>
+
+        <div id="questions-container"></div>
+
+        <button type="button" id="add-question-btn"
+                class="w-full border-2 border-dashed border-gray-200 hover:border-violet-300 hover:bg-violet-50/40 text-gray-500 hover:text-violet-600 rounded-xl py-3 text-sm font-medium transition flex items-center justify-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14" stroke-linecap="round"/>
+          </svg>
+          Добавить вопрос
+        </button>
+      </div>
+
+      <!-- Кнопки отправки -->
+      <div class="flex items-center gap-3 sticky bottom-4">
+        <a href="/admin"
+           class="flex-1 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold py-3 rounded-xl text-sm text-center transition shadow-sm">
+          Отмена
+        </a>
+        <button type="submit"
+                class="flex-1 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold py-3 rounded-xl text-sm transition shadow-sm">
+          {{ 'Сохранить изменения' if survey and survey.id else 'Создать опрос' }}
+        </button>
+      </div>
+
+    </form>
+
+  </main>
+</div>
+
+<script>
+const initialQuestions = {{ q_data | tojson }};
+
+function slugify(str) {
+  return (str || '').toLowerCase().trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') || '';
+}
+
+const titleInput = document.getElementById('title-input');
+const slugInput = document.getElementById('slug-input');
+const slugPreview = document.getElementById('slug-preview');
+let slugManuallyEdited = !!slugInput.value;
+
+function updateSlugPreview() {
+  slugPreview.textContent = '/s/' + (slugInput.value || 'your-slug');
+}
+titleInput.addEventListener('input', () => {
+  if (!slugManuallyEdited) {
+    slugInput.value = slugify(titleInput.value);
+    updateSlugPreview();
+  }
+});
+slugInput.addEventListener('input', () => {
+  slugManuallyEdited = true;
+  updateSlugPreview();
+});
+
+const container = document.getElementById('questions-container');
+const countLabel = document.getElementById('question-count-label');
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function questionWord(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'вопрос';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'вопроса';
+  return 'вопросов';
+}
+
+function createOptionRow(value) {
+  const row = document.createElement('div');
+  row.className = 'flex items-center gap-2 mb-2';
+  row.innerHTML = `
+    <input type="text" class="option-input flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" placeholder="Текст варианта ответа" value="${escapeHtml(value)}">
+    <button type="button" class="remove-option text-gray-300 hover:text-red-500 transition p-1 flex-shrink-0">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+    </button>`;
+  row.querySelector('.remove-option').addEventListener('click', () => row.remove());
+  return row;
+}
+
+function createQuestionBlock(data) {
+  data = data || { text: '', options: ['', ''], page: 1 };
+  const block = document.createElement('div');
+  block.className = 'question-block bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-4';
+  block.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <span class="q-index-label text-xs font-bold text-violet-600 uppercase tracking-wide"></span>
+      <div class="flex items-center gap-2">
+        <label class="text-xs text-gray-500 flex items-center gap-1.5">
+          Страница
+          <input type="number" min="1" value="${data.page || 1}" class="q-page w-14 border border-gray-200 rounded-lg px-2 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-violet-500">
+        </label>
+        <button type="button" class="remove-question text-gray-400 hover:text-red-500 transition p-1" title="Удалить вопрос">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>
+        </button>
+      </div>
+    </div>
+    <textarea class="q-text w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none" rows="2" placeholder="Текст вопроса...">${escapeHtml(data.text)}</textarea>
+    <div class="options-list mb-2"></div>
+    <button type="button" class="add-option text-xs font-medium text-violet-600 hover:text-violet-700 transition flex items-center gap-1">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+      Добавить вариант
+    </button>`;
+
+  const optionsList = block.querySelector('.options-list');
+  const opts = (data.options && data.options.length) ? data.options : ['', ''];
+  opts.forEach(opt => optionsList.appendChild(createOptionRow(opt)));
+
+  block.querySelector('.remove-question').addEventListener('click', () => {
+    if (container.querySelectorAll('.question-block').length <= 1) {
+      alert('В опросе должен остаться хотя бы один вопрос.');
+      return;
+    }
+    block.remove();
+    reindex();
+  });
+  block.querySelector('.add-option').addEventListener('click', () => {
+    optionsList.appendChild(createOptionRow(''));
+  });
+
+  return block;
+}
+
+function addQuestion(data) {
+  const block = createQuestionBlock(data);
+  container.appendChild(block);
+  reindex();
+}
+
+function reindex() {
+  const blocks = container.querySelectorAll('.question-block');
+  blocks.forEach((block, i) => {
+    block.querySelector('.q-index-label').textContent = 'Вопрос ' + (i + 1);
+  });
+  countLabel.textContent = blocks.length + ' ' + questionWord(blocks.length);
+}
+
+document.getElementById('add-question-btn').addEventListener('click', () => addQuestion());
+
+if (initialQuestions && initialQuestions.length) {
+  initialQuestions
+    .slice()
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .forEach(q => addQuestion(q));
+} else {
+  addQuestion();
+}
+updateSlugPreview();
+
+// Сериализуем блоки вопросов в скрытые поля под формат, ожидаемый бэкендом
+document.getElementById('survey-form').addEventListener('submit', function (e) {
+  this.querySelectorAll('.generated-field').forEach(el => el.remove());
+
+  const blocks = container.querySelectorAll('.question-block');
+  let validIndex = 0;
+
+  blocks.forEach((block) => {
+    const text = block.querySelector('.q-text').value.trim();
+    const page = block.querySelector('.q-page').value || '1';
+    const opts = Array.from(block.querySelectorAll('.option-input'))
+      .map(inp => inp.value.trim())
+      .filter(Boolean);
+
+    if (!text || opts.length < 1) return;
+
+    appendHidden(this, 'q_text[]', text);
+    appendHidden(this, 'q_page[]', page);
+    opts.forEach(opt => appendHidden(this, `q_options_${validIndex}[]`, opt));
+    validIndex++;
+  });
+
+  if (validIndex === 0) {
+    e.preventDefault();
+    alert('Добавьте хотя бы один вопрос с текстом и минимум одним вариантом ответа.');
+    return;
+  }
+
+  showLoading(this.querySelector('[type="submit"]'), 'Сохраняем…');
+});
+
+function appendHidden(form, name, value) {
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = name;
+  input.value = value;
+  input.className = 'generated-field';
+  form.appendChild(input);
+}
+</script>
+{% endblock %}

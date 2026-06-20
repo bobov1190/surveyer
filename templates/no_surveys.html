@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Нет активных опросов{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+  <div class="w-full max-w-sm text-center animate-in">
+    <div class="inline-flex items-center justify-center w-16 h-16 bg-violet-100 rounded-2xl mb-6">
+      <svg class="w-8 h-8 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/>
+      </svg>
+    </div>
+    <h1 class="text-xl font-bold text-gray-900 mb-2">Сейчас нет активных опросов</h1>
+    <p class="text-sm text-gray-500 leading-relaxed">
+      По этой ссылке пока ничего не опубликовано.
+      Загляните позже или уточните у того, кто прислал вам ссылку.
+    </p>
+    <a href="/admin/login"
+       class="inline-block mt-8 text-xs text-gray-400 hover:text-gray-600 transition">
+      Вход для администратора →
+    </a>
+  </div>
+</div>
+{% endblock %}

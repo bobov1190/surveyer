@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Thank You!{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+  <div class="w-full max-w-sm">
+
+    <div class="bg-violet-600 p-10 rounded-2xl shadow-xl flex flex-col items-center text-center text-white relative overflow-hidden">
+      <!-- Decorative blobs -->
+      <div class="absolute w-10 h-10 bg-white opacity-20 rounded-full top-8 left-8 pointer-events-none"></div>
+      <div class="absolute w-24 h-24 bg-white opacity-10 rounded-full -top-4 right-6 pointer-events-none"></div>
+      <div class="absolute w-14 h-14 bg-white opacity-10 rounded-full bottom-20 left-6 pointer-events-none"></div>
+      <div class="absolute w-8  h-8  bg-white opacity-15 rounded-full bottom-8 right-10 pointer-events-none"></div>
+      <div class="absolute w-6  h-6  bg-white opacity-20 rounded-full top-1/2 right-6 pointer-events-none"></div>
+
+      <!-- Check icon -->
+      <div class="relative z-10 w-24 h-24 bg-white rounded-full flex items-center justify-center mb-8 shadow-lg">
+        <svg class="w-12 h-12 text-violet-600" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="3">
+          <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <h1 class="relative z-10 text-2xl font-extrabold leading-tight mb-3 max-w-xs">
+        Thank you for completing the survey!
+      </h1>
+      <p class="relative z-10 text-violet-200 text-sm leading-relaxed mb-8">
+        Your responses have been recorded.<br>We really appreciate your time!
+      </p>
+
+      <a href="/survey/1"
+         class="relative z-10 w-full bg-white text-violet-700 font-bold py-3 px-6 rounded-xl
+                hover:bg-violet-50 active:bg-violet-100 transition text-sm shadow-md text-center block">
+        Take the survey again
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
